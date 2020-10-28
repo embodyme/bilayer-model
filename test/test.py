@@ -9,7 +9,7 @@ from infer import InferenceWrapper2
 import cv2
 import numpy 
 import time
-
+from test.image_feed import CVFeed
 def to_image(img_tensor, seg_tensor=None):
     img_array = ((img_tensor.clamp(-1, 1).cpu().numpy() + 1) / 2).transpose(1, 2, 0) * 255
     
@@ -41,14 +41,11 @@ source_data_dict = {
 
 module.initialization(source_data_dict)
 
-vs = cv2.VideoCapture(0)
-vs.set(3,1280) #width
-vs.set(4,720) #height
+post_processing = lambda x: Image.fromarray(cv2.cvtColor(x,cv2.COLOR_BGR2RGB))  
+vs = CVFeed(size=(1280, 720), post_processing=post_processing)
 
 while(True):
-    (grabbed, camera_frame) = vs.read()
-
-    tgt_image = Image.fromarray(cv2.cvtColor(camera_frame,cv2.COLOR_BGR2RGB))  
+    tgt_image, _, _ = vs.read()
 
     target_data_dict = {
         'target_imgs': np.asarray(tgt_image)[None]} # B x H x W x # 3
