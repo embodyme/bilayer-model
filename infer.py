@@ -15,7 +15,9 @@ from datasets import utils as ds_utils
 from runners import utils as rn_utils
 from external.Graphonomy import wrapper
 import face_alignment
-
+from YFYF.Alignment.Detection.ulfg_detector import UlfgDetector
+from YFYF.Alignment.Landmarks.FaLMDetector import FaLMDetector
+from YFYF.Tracking.BaseTracker import BaseTracker
 import time
 
 class InferenceWrapper(nn.Module):
@@ -76,7 +78,10 @@ class InferenceWrapper(nn.Module):
                     map_location='cpu'))
 
         # Stickman/facemasks drawer
-        self.fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=True)
+        self.face_detector = UlfgDetector()
+        self.lm_detector = FaLMDetector()
+        self.face_tracker = BaseTracker(self.face_detector, self.lm_detector)
+        # self.detector = UlfgDetector()
 
         self.net_seg = wrapper.SegmentationWrapper(self.args)
 
@@ -99,7 +104,9 @@ class InferenceWrapper(nn.Module):
             N = input_imgs.shape[0]
 
         for i in range(N):
-            pose = self.fa.get_landmarks(input_imgs[i])[0]
+            rect, landmarks = self.face_tracker.detect(input_imgs[i])
+            self.face_tracker.reset() #not tracking
+            pose = list(landmarks.values())[0]
 
             center = ((pose.min(0) + pose.max(0)) / 2).round().astype(int)
             size = int(max(pose[:, 0].max() - pose[:, 0].min(), pose[:, 1].max() - pose[:, 1].min()))
@@ -213,6 +220,7 @@ class InferenceWrapper2(InferenceWrapper):
 
     def get_pose(self, input_imgs, crop_data=True):
         poses = []
+        print('Get pose')
         if len(input_imgs.shape) == 3:
             input_imgs = input_imgs[None]
             N = 1
@@ -221,7 +229,10 @@ class InferenceWrapper2(InferenceWrapper):
             N = input_imgs.shape[0]
 
         for i in range(N):
-            pose = self.fa.get_landmarks(input_imgs[i])[0]
+            rect, landmarks = self.face_tracker.detect(input_imgs[i])
+            pose = list(landmarks.values())[0]
+            # print(f'Landmark : {pose.shape}')
+            
 
             center = ((pose.min(0) + pose.max(0)) / 2).round().astype(int)
             size = int(max(pose[:, 0].max() - pose[:, 0].min(), pose[:, 1].max() - pose[:, 1].min()))
@@ -260,7 +271,7 @@ class InferenceWrapper2(InferenceWrapper):
         start = time.time()
         target_poses = self.get_pose(data_dict['target_imgs'], crop_data)
         elapsed_time = time.time() - start
-        print ("get_pose_time:{0}".format(elapsed_time) + "[sec]")
+        print (f"get_pose_time:{elapsed_time}[sec]")
 
         data_dict = self.source_data_dict
         data_dict['target_poses'] = target_poses
