@@ -6,7 +6,7 @@ from torchvision import transforms
 import torch.nn.functional as F
 import numpy as np
 import cv2
-
+from pathlib import Path
 from .networks import deeplab_xception_transfer, graph
 
 
@@ -18,8 +18,8 @@ class SegmentationWrapper(nn.Module):
 
         self.net = deeplab_xception_transfer.deeplab_xception_transfer_projection_savemem(
             n_classes=20, hidden_layers=128, source_classes=7)
-        
-        x = torch.load(f'{args.project_dir}/pretrained_weights/graphonomy/pretrained_model.pth')
+        path = Path(args.project_dir) / 'pretrained_weights/graphonomy/pretrained_model.pth'
+        x = torch.load(path)
         self.net.load_source_model(x)
 
         if self.use_gpus:
