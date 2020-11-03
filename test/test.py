@@ -9,7 +9,8 @@ from infer import InferenceWrapper2
 import cv2
 import numpy 
 import time
-from test.image_feed import CVFeed
+from image_feed import CVFeed
+
 def to_image(img_tensor, seg_tensor=None):
     img_array = ((img_tensor.clamp(-1, 1).cpu().numpy() + 1) / 2).transpose(1, 2, 0) * 255
     
@@ -41,11 +42,15 @@ source_data_dict = {
 
 module.initialization(source_data_dict)
 
-post_processing = lambda x: Image.fromarray(cv2.cvtColor(x,cv2.COLOR_BGR2RGB))  
+post_processing = [lambda x: Image.fromarray(cv2.cvtColor(x,cv2.COLOR_BGR2RGB))  ]
 vs = CVFeed(size=(1280, 720), post_processing=post_processing)
-
+vs.start()
+start = time.time()
+i = 0
 while(True):
     tgt_image, _, _ = vs.read()
+    if tgt_image is None:       
+        continue
 
     target_data_dict = {
         'target_imgs': np.asarray(tgt_image)[None]} # B x H x W x # 3
@@ -56,5 +61,9 @@ while(True):
 
     output_img = cv2.cvtColor(numpy.asarray(pred_img),cv2.COLOR_RGB2BGR) 
     cv2.imshow("cv", output_img)
+    i += 1
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+end = time.time()    
+print(f'FPS: {i/(end-start)}, Duration: {(end-start)}, n_frames: {i}')
+vs.kill()
